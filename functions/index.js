@@ -522,6 +522,7 @@ async function ullensakerEventData(ullensakerEventID) {
 
 //#region Stavanger Konserthus (TIX)
 
+
 async function stavanagerKonserthus(){
   return await axios.get("https://eventapi.tix.no/v2/Events/c359ed7aa32e48ba")
   .then(response => {
@@ -552,3 +553,4 @@ async function importEventDataTIX(events) {
   }
 }
 //#endregion
+
