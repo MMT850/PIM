@@ -8,22 +8,869 @@ admin.initializeApp();
 const db = admin.firestore();
 db.settings({ ignoreUdefinedProperties: true });
 
+//Bearer token for DX API
+const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6ImM2ZTQxOGQ3MGVlNjNkMDA3ZmI2NmFhMzYyM2U3M2Q2NzZlYmQ2Njk2NzQzOGNiOGVjODdjMTcwNWJmYmMxZGQzNmU3ZWE1ZDQ0NDQ4YTlhIn0.eyJhdWQiOiIxIiwianRpIjoiYzZlNDE4ZDcwZWU2M2QwMDdmYjY2YWEzNjIzZTczZDY3NmViZDY2OTY3NDM4Y2I4ZWM4N2MxNzA1YmZiYzFkZDM2ZTdlYTVkNDQ0NDhhOWEiLCJpYXQiOjE2MjMyNDEwMzEsIm5iZiI6MTYyMzI0MTAzMSwiZXhwIjo0Nzc4OTE0NjMxLCJzdWIiOiIyOCIsInNjb3BlcyI6W119.BiIQJgoJ6lyVxiQ2FppMmiZFGSPO5LA-Fc-o91aIabgveoW-G6XprAm_uUClwuOvUHPedqlThsZFokB9VWx9zLLaJ31RX_-e7o-tbJVJLMcdo-IeGr2Y3-o0zo2Jq3_uipdUnjXu9X4rK76RAs8h9mPGXsPc2cN6n55trAVREJQXgpym5IyO-Hu9iiXyZahwAiB13a839LgNzK1OO1kcMuMTFLNpj5grlMQ3b7QXrg5ark4Sd6rBfEnQlk-g3lKKcEb2W3Bk30_HmmBlMG5u8FcGihrFoirdY_6_WFJ_SVZeOmymAjhRUQXBzYDa21NZZiQo0fT9Vs-mJzJASZTo2iI_0jnrULwDCztyHL1NM0i7Akq4beSthidaa2X2O4vBvesvklUPoKU6kcdjlV03d7_HKiMC5klh9OhqIPA8roMIHLmiASIaxWNu_i6scIf5PImlovoyuwD03QC_6aGF8FBq2zEQ17TIw0xeK3tKdBE2sbwfFQyV1EOlmfYW9e_JmyxsWbbpPbVXhgjKqEXamTBGpiprjbETF3C6Io1tyj54pDuOnKkdaTpOGJvwCTvj6fXlPooRURwMHa-l9892M_7S3z8pyERpwrsavVmTop06tfks-6XKtOR9T0w1GLsKVb2Gq_aQKgwRlZlJ912OdBAxrvkbbLqPeVQSneVOxf0";
+const config = {
+  headers: { Authorization: `Bearer ${token}`}
+}
+
 
 // Main function that calls functions to populate firestore from all API data.
 exports.getAllAPI = functions.https.onRequest(async () => {
-  return  myMotown(), operaOstfold(), oseana(), stavanagerKonserthus(), ullensaker(), brottetAmfi(), 
-  stavangeren(), mossKulturhus(), solaKulturhus(), aelvespeilet(), drammenUnion(), 
-  drammenTeater(), notteroyKulturhus(), kongsberg(), ibsenhuset(), arendalKulturhus(), 
-  askimKulturhus(), sandnesKulturhus(), bolgenKulturhus();;
+  return getEvents();//fredrikstadguttane(), nia(), bolgenKino(), //sarpsborg(), myMotown(), operaOstfold(), oseana(), stavanagerKonserthus(), ullensaker(), brottetAmfi(), 
+  // stavangeren(), mossKulturhus(), solaKulturhus(), aelvespeilet(), drammenUnion(), 
+  // drammenTeater(), notteroyKulturhus(), kongsberg(), ibsenhuset(), arendalKulturhus(), 
+  // askimKulturhus(), sandnesKulturhus(), bolgenKulturhus();
 
 });
 
-//#region Bølgen Kino (TicketCo)
+//#region Test
+let newDate = new Date()
+let formatedDate = newDate.toISOString().split('T')[0];
+const dxAPI = [
+  {
+    "all": `https://public.dx.no/v1/partners/178/events/?size=50&order_by=nowfuturepast`,
+    "single": `https://public.dx.no/v1/partners/178/events/`,
+    "name": "Fredrikstadguttane"
+  },
+  {
+    "all": `https://public.dx.no/v1/partners/318/events/?size=50&order_by=nowfuturepast`,
+    "single": `https://public.dx.no/v1/partners/318/events/`,
+    "name": "NIA"
+  },
+  {
+    "all": `https://public.dx.no/v1/partners/168/events/?size=50&order_by=nowfuturepast`,
+    "single": `https://public.dx.no/v1/partners/168/events/`,
+    "name": "BølgenKino"
+  },
+];
+
+async function getEvents(){
+  for (let i = 0; i < dxAPI.length; i++) {
+    await axios.get(dxAPI[i]["all"] +'&after_date='+ formatedDate, config)
+    .then(response => {
+      
+      const events = response.data["data"];
+      events.map(async element => {
+        
+        const eventID = element.event_id
+        await axios.get(dxAPI[i]["single"] + eventID, config)
+        .then(async response => {
+          
+          const eventGroupId = response.data["data"];
+          let prices = eventGroupId.ticket_sales[0].price_categories.map(element => element.price);
+          const id = eventGroupId.event_id;
+          const name = eventGroupId.title;
+
+          let description;
+          try {
+            description = eventGroupId.production.contents[0].body;
+          }
+          catch(err){
+            description = 'No description';
+          }
+          const startDate = eventGroupId.begin;
+          const endDate = eventGroupId.end;
+
+          let image;
+          try {
+            let imageType = eventGroupId.production.assets.find(image => image.type === "image" || image.type === "poster")
+            image = imageType.url;
+          }
+          catch(err){
+            image = 'No image';
+          }
+
+          const priceMin = Math.min(...prices);
+          const priceMax = Math.max(...prices);
+          const purchaseUrlNb = eventGroupId.purchase_url;
+          const purchaseUrlEn = eventGroupId.purchase_url;
+          const purchaseUrlSv = eventGroupId.purchase_url;
+          const categories = "";
+          let tags;
+          try {
+            tags = eventGroupId.production.tags.toString();
+          }
+          catch(err){
+            tags = 'No tags';
+          }
+          const capacity = eventGroupId.ticket_sales[0].capacity;
+          const remaining = eventGroupId.ticket_sales[0].available;
+          //const sold = eventGroupId.ticket_sales[0].sold;
+          //const locationName = eventGroupId.location_name;
+
+          const reworkedEvent = 
+          {
+              "ExternalReferenceNumber": "",
+              "EventGroupId": id,
+              "Name": name,
+              "SubTitle": "",
+              "Description": description,
+              "ImageCacheKey": "",
+              "EventImagePath": image,
+              "FeaturedImagePath": image,
+              "PosterImagePath": image,
+              "ExternalUrl": "",
+              "IsFilm": "",
+              "PurchaseUrls": [
+                {
+                    "LanguageName": "Norsk",
+                    "Culture": "nb-NO",
+                    "TwoLetterCulture": "nb",
+                    "Link": purchaseUrlNb
+                },
+                {
+                    "LanguageName": "Svensk",
+                    "Culture": "sv-SE",
+                    "TwoLetterCulture": "sv",
+                    "Link": purchaseUrlSv
+                },
+                {
+                    "LanguageName": "English",
+                    "Culture": "en-GB",
+                    "TwoLetterCulture": "en",
+                    "Link": purchaseUrlEn
+                }
+              ],
+              "Translations": [],
+              "Dates": [
+                  {
+                      "EventId": id,
+                      "DefaultEventGroupId": "",
+                      "Name": name,
+                      "StartDate": startDate,
+                      "StartDateUTCUnix": "",
+                      "EndDate": endDate,
+                      "EndDateUTCUnix": "",
+                      "WaitingList": "",
+                      "OnlineSaleStart": "",
+                      "OnlineSaleStartUTCUnix": "",
+                      "OnlineSaleEnd": "",
+                      "OnlineSaleEndUTCUnix": "",
+                      "Venue": "",
+                      "Hall": "",
+                      "Promoter": "",
+                      "SoldOut": "",
+                      "Duration": "",
+                      "SaleStatus": "",
+                      "SaleStatusText": "",
+                      "Capacity": capacity,
+                      "Remaining": remaining,
+                      "Categories": categories,
+                      "CategoryTranslations": {},
+                      "Tags": tags,
+                      "Translations": [],
+                      "PurchaseUrls": [
+                        {
+                            "LanguageName": "Norsk",
+                            "Culture": "nb-NO",
+                            "TwoLetterCulture": "nb",
+                            "Link": purchaseUrlNb
+                        },
+                        {
+                            "LanguageName": "Svensk",
+                            "Culture": "sv-SE",
+                            "TwoLetterCulture": "sv",
+                            "Link": purchaseUrlSv
+                        },
+                        {
+                            "LanguageName": "English",
+                            "Culture": "en-GB",
+                            "TwoLetterCulture": "en",
+                            "Link": purchaseUrlEn
+                        }
+                      ],
+                      "ProductPurchaseUrls": [],
+                      "Products": [],
+                      "MinPrice": priceMin,
+                      "MaxPrice": priceMax,
+                      "Prices": [],
+                      "Benefits": []
+                  }
+              ]
+          };
+          //Add reworkedEvent to firestore
+          const eventRef = admin.firestore().collection(`konserthus/${dxAPI[i]["name"]}/events`).doc(eventGroupId.event_id.toString());
+          const res = await eventRef.set(reworkedEvent);
+          console.log(res);
+          })
+        .catch(error => {
+          console.log(error);
+        });
+      });
+    })
+    .catch(error => {
+      console.log(error);
+    });
+  }
+};
+//#endregion
+
+//#region Fredrikstadguttane (DX)
+
+
+async function fredrikstadguttane(){
+  console.log(formatedDate);
+  return await axios.get(`https://public.dx.no/v1/partners/178/events/?size=50&after_date=${formatedDate}&order_by=nowfuturepast`, config)
+  .then(response => {
+    const fredrikstadguttaneEvents = response.data["data"];
+    fredrikstadguttaneEvents.map(async element => {
+      const eventID = element.event_id
+      //console.log(eventID);
+      return fredrikstadguttaneEventData(eventID);
+    });
+  })
+  .catch(error => {
+    console.log(error);
+  });
+};
+
+/**
+ * Imports the Tix API data into firestore
+ * @param {Object} events
+ * @return {Promise<void>}
+ */
+async function fredrikstadguttaneEventData(eventID) {
+  return await axios.get(`https://public.dx.no/v1/partners/178/events/${eventID}`, config)
+  .then(async response => {
+    const eventGroupId = response.data["data"];
+
+    let prices = eventGroupId.ticket_sales[0].price_categories.map(element => element.price);
+
+    const id = eventGroupId.event_id;
+    const name = eventGroupId.title;
+
+    let description;
+    try {
+      description = eventGroupId.production.contents[0].body;
+    }
+    catch(err){
+      description = 'No description';
+    }
+    const startDate = eventGroupId.begin;
+    const endDate = eventGroupId.end;
+
+    let image;
+    try {
+      let imageType = eventGroupId.production.assets.find(image => image.type === "image" || image.type === "poster")
+      image = imageType.url;
+    }
+    catch(err){
+      image = 'No image';
+    }
+
+    const priceMin = Math.min(...prices);
+    const priceMax = Math.max(...prices);
+    const purchaseUrlNb = eventGroupId.purchase_url;
+    const purchaseUrlEn = eventGroupId.purchase_url;
+    const purchaseUrlSv = eventGroupId.purchase_url;
+    const categories = "";
+    let tags;
+    try {
+      tags = eventGroupId.production.tags.toString();
+    }
+    catch(err){
+      tags = 'No tags';
+    }
+    const capacity = eventGroupId.ticket_sales[0].capacity;
+    const remaining = eventGroupId.ticket_sales[0].available;
+    //const sold = eventGroupId.ticket_sales[0].sold;
+    //const locationName = eventGroupId.location_name;
+
+    const reworkedEvent = 
+    {
+        "ExternalReferenceNumber": "",
+        "EventGroupId": id,
+        "Name": name,
+        "SubTitle": "",
+        "Description": description,
+        "ImageCacheKey": "",
+        "EventImagePath": image,
+        "FeaturedImagePath": image,
+        "PosterImagePath": image,
+        "ExternalUrl": "",
+        "IsFilm": "",
+        "PurchaseUrls": [
+          {
+              "LanguageName": "Norsk",
+              "Culture": "nb-NO",
+              "TwoLetterCulture": "nb",
+              "Link": purchaseUrlNb
+          },
+          {
+              "LanguageName": "Svensk",
+              "Culture": "sv-SE",
+              "TwoLetterCulture": "sv",
+              "Link": purchaseUrlSv
+          },
+          {
+              "LanguageName": "English",
+              "Culture": "en-GB",
+              "TwoLetterCulture": "en",
+              "Link": purchaseUrlEn
+          }
+        ],
+        "Translations": [],
+        "Dates": [
+            {
+                "EventId": id,
+                "DefaultEventGroupId": "",
+                "Name": name,
+                "StartDate": startDate,
+                "StartDateUTCUnix": "",
+                "EndDate": endDate,
+                "EndDateUTCUnix": "",
+                "WaitingList": "",
+                "OnlineSaleStart": "",
+                "OnlineSaleStartUTCUnix": "",
+                "OnlineSaleEnd": "",
+                "OnlineSaleEndUTCUnix": "",
+                "Venue": "",
+                "Hall": "",
+                "Promoter": "",
+                "SoldOut": "",
+                "Duration": "",
+                "SaleStatus": "",
+                "SaleStatusText": "",
+                "Capacity": capacity,
+                "Remaining": remaining,
+                "Categories": categories,
+                "CategoryTranslations": {},
+                "Tags": tags,
+                "Translations": [],
+                "PurchaseUrls": [
+                  {
+                      "LanguageName": "Norsk",
+                      "Culture": "nb-NO",
+                      "TwoLetterCulture": "nb",
+                      "Link": purchaseUrlNb
+                  },
+                  {
+                      "LanguageName": "Svensk",
+                      "Culture": "sv-SE",
+                      "TwoLetterCulture": "sv",
+                      "Link": purchaseUrlSv
+                  },
+                  {
+                      "LanguageName": "English",
+                      "Culture": "en-GB",
+                      "TwoLetterCulture": "en",
+                      "Link": purchaseUrlEn
+                  }
+                ],
+                "ProductPurchaseUrls": [],
+                "Products": [],
+                "MinPrice": priceMin,
+                "MaxPrice": priceMax,
+                "Prices": [],
+                "Benefits": []
+            }
+        ]
+    };
+    //Add reworkedEvent to firestore
+    const eventRef = admin.firestore().collection(`konserthus/fredrikstadguttane/events`).doc(eventGroupId.event_id.toString());
+    const res = await eventRef.set(reworkedEvent);
+    console.log(res);
+    })
+  .catch(error => {
+    console.log(error);
+  });
+}
+//#endregion
+
+//#region NIA (DX)
+
+async function nia(){
+  console.log(formatedDate);
+  return await axios.get(`https://public.dx.no/v1/partners/318/events/?size=50&after_date=${formatedDate}&order_by=nowfuturepast`, config)
+  .then(response => {
+    const niaEvents = response.data["data"];
+    niaEvents.map(async element => {
+      const eventID = element.event_id
+      //console.log(eventID);
+      return niaEventData(eventID);
+    });
+  })
+  .catch(error => {
+    console.log(error);
+  });
+};
+
+/**
+ * Imports the Tix API data into firestore
+ * @param {Object} events
+ * @return {Promise<void>}
+ */
+async function niaEventData(eventID) {
+  return await axios.get(`https://public.dx.no/v1/partners/318/events/${eventID}`, config)
+  .then(async response => {
+    const eventGroupId = response.data["data"];
+
+    let prices = eventGroupId.ticket_sales[0].price_categories.map(element => element.price);
+
+    const id = eventGroupId.event_id;
+    const name = eventGroupId.title;
+
+    let description;
+    try {
+      description = eventGroupId.production.contents[0].body;
+    }
+    catch(err){
+      description = 'No description';
+    }
+    const startDate = eventGroupId.begin;
+    const endDate = eventGroupId.end;
+
+    let image;
+    try {
+      let imageType = eventGroupId.production.assets.find(image => image.type === "image" || image.type === "poster")
+      image = imageType.url;
+    }
+    catch(err){
+      image = 'No image';
+    }
+
+    const priceMin = Math.min(...prices);
+    const priceMax = Math.max(...prices);
+    const purchaseUrlNb = eventGroupId.purchase_url;
+    const purchaseUrlEn = eventGroupId.purchase_url;
+    const purchaseUrlSv = eventGroupId.purchase_url;
+    const categories = "";
+    let tags;
+    try {
+      tags = eventGroupId.production.tags.toString();
+    }
+    catch(err){
+      tags = 'No tags';
+    }
+    const capacity = eventGroupId.ticket_sales[0].capacity;
+    const remaining = eventGroupId.ticket_sales[0].available;
+    //const sold = eventGroupId.ticket_sales[0].sold;
+    //const locationName = eventGroupId.location_name;
+
+    const reworkedEvent = 
+    {
+        "ExternalReferenceNumber": "",
+        "EventGroupId": id,
+        "Name": name,
+        "SubTitle": "",
+        "Description": description,
+        "ImageCacheKey": "",
+        "EventImagePath": image,
+        "FeaturedImagePath": image,
+        "PosterImagePath": image,
+        "ExternalUrl": "",
+        "IsFilm": "",
+        "PurchaseUrls": [
+          {
+              "LanguageName": "Norsk",
+              "Culture": "nb-NO",
+              "TwoLetterCulture": "nb",
+              "Link": purchaseUrlNb
+          },
+          {
+              "LanguageName": "Svensk",
+              "Culture": "sv-SE",
+              "TwoLetterCulture": "sv",
+              "Link": purchaseUrlSv
+          },
+          {
+              "LanguageName": "English",
+              "Culture": "en-GB",
+              "TwoLetterCulture": "en",
+              "Link": purchaseUrlEn
+          }
+        ],
+        "Translations": [],
+        "Dates": [
+            {
+                "EventId": id,
+                "DefaultEventGroupId": "",
+                "Name": name,
+                "StartDate": startDate,
+                "StartDateUTCUnix": "",
+                "EndDate": endDate,
+                "EndDateUTCUnix": "",
+                "WaitingList": "",
+                "OnlineSaleStart": "",
+                "OnlineSaleStartUTCUnix": "",
+                "OnlineSaleEnd": "",
+                "OnlineSaleEndUTCUnix": "",
+                "Venue": "",
+                "Hall": "",
+                "Promoter": "",
+                "SoldOut": "",
+                "Duration": "",
+                "SaleStatus": "",
+                "SaleStatusText": "",
+                "Capacity": capacity,
+                "Remaining": remaining,
+                "Categories": categories,
+                "CategoryTranslations": {},
+                "Tags": tags,
+                "Translations": [],
+                "PurchaseUrls": [
+                  {
+                      "LanguageName": "Norsk",
+                      "Culture": "nb-NO",
+                      "TwoLetterCulture": "nb",
+                      "Link": purchaseUrlNb
+                  },
+                  {
+                      "LanguageName": "Svensk",
+                      "Culture": "sv-SE",
+                      "TwoLetterCulture": "sv",
+                      "Link": purchaseUrlSv
+                  },
+                  {
+                      "LanguageName": "English",
+                      "Culture": "en-GB",
+                      "TwoLetterCulture": "en",
+                      "Link": purchaseUrlEn
+                  }
+                ],
+                "ProductPurchaseUrls": [],
+                "Products": [],
+                "MinPrice": priceMin,
+                "MaxPrice": priceMax,
+                "Prices": [],
+                "Benefits": []
+            }
+        ]
+    };
+    //Add reworkedEvent to firestore
+    const eventRef = admin.firestore().collection(`konserthus/NIA/events`).doc(eventGroupId.event_id.toString());
+    const res = await eventRef.set(reworkedEvent);
+    console.log(res);
+    })
+  .catch(error => {
+    console.log(error);
+  });
+}
+//#endregion
+
+//#region Bølgen Kino (DX)
+
+async function bolgenKino(){
+  console.log(formatedDate);
+  return await axios.get(`https://public.dx.no/v1/partners/168/events/?size=50&after_date=${formatedDate}&order_by=nowfuturepast`, config)
+  .then(response => {
+    const bolgenEvents = response.data["data"];
+    bolgenEvents.map(async element => {
+      const eventID = element.event_id
+      //console.log(eventID);
+      return bolgenKinoEventData(eventID);
+    });
+  })
+  .catch(error => {
+    console.log(error);
+  });
+};
+
+/**
+ * Imports the Tix API data into firestore
+ * @param {Object} events
+ * @return {Promise<void>}
+ */
+async function bolgenKinoEventData(eventID) {
+  return await axios.get(`https://public.dx.no/v1/partners/168/events/${eventID}`, config)
+  .then(async response => {
+    const eventGroupId = response.data["data"];
+    
+    let prices = eventGroupId.ticket_sales[0].price_categories.map(element => element.price);
+
+    const id = eventGroupId.event_id;
+    const name = eventGroupId.title;
+    
+    let description;
+    try {
+      description = eventGroupId.production.contents[0].body;
+    }
+    catch(err){
+      description = 'No description';
+    }
+    const startDate = eventGroupId.begin;
+    const endDate = eventGroupId.end;
+
+    let image;
+    try {
+      let imageType = eventGroupId.production.assets.find(image => image.type === "image" || image.type === "poster")
+      image = imageType.url;
+    }
+    catch(err){
+      image = 'No image';
+    }
+
+    const priceMin = Math.min(...prices);
+    const priceMax = Math.max(...prices);
+    const purchaseUrlNb = eventGroupId.purchase_url;
+    const purchaseUrlEn = eventGroupId.purchase_url;
+    const purchaseUrlSv = eventGroupId.purchase_url;
+    const categories = "";
+    let tags;
+    try {
+      tags = eventGroupId.production.tags.toString();
+    }
+    catch(err){
+      tags = 'No tags';
+    }
+    const capacity = eventGroupId.ticket_sales[0].capacity;
+    const remaining = eventGroupId.ticket_sales[0].available;
+    //const sold = eventGroupId.ticket_sales[0].sold;
+    //const locationName = eventGroupId.location_name;
+
+    const reworkedEvent = 
+    {
+        "ExternalReferenceNumber": "",
+        "EventGroupId": id,
+        "Name": name,
+        "SubTitle": "",
+        "Description": description,
+        "ImageCacheKey": "",
+        "EventImagePath": image,
+        "FeaturedImagePath": image,
+        "PosterImagePath": image,
+        "ExternalUrl": "",
+        "IsFilm": "",
+        "PurchaseUrls": [
+          {
+              "LanguageName": "Norsk",
+              "Culture": "nb-NO",
+              "TwoLetterCulture": "nb",
+              "Link": purchaseUrlNb
+          },
+          {
+              "LanguageName": "Svensk",
+              "Culture": "sv-SE",
+              "TwoLetterCulture": "sv",
+              "Link": purchaseUrlSv
+          },
+          {
+              "LanguageName": "English",
+              "Culture": "en-GB",
+              "TwoLetterCulture": "en",
+              "Link": purchaseUrlEn
+          }
+        ],
+        "Translations": [],
+        "Dates": [
+            {
+                "EventId": id,
+                "DefaultEventGroupId": "",
+                "Name": name,
+                "StartDate": startDate,
+                "StartDateUTCUnix": "",
+                "EndDate": endDate,
+                "EndDateUTCUnix": "",
+                "WaitingList": "",
+                "OnlineSaleStart": "",
+                "OnlineSaleStartUTCUnix": "",
+                "OnlineSaleEnd": "",
+                "OnlineSaleEndUTCUnix": "",
+                "Venue": "",
+                "Hall": "",
+                "Promoter": "",
+                "SoldOut": "",
+                "Duration": "",
+                "SaleStatus": "",
+                "SaleStatusText": "",
+                "Capacity": capacity,
+                "Remaining": remaining,
+                "Categories": categories,
+                "CategoryTranslations": {},
+                "Tags": tags,
+                "Translations": [],
+                "PurchaseUrls": [
+                  {
+                      "LanguageName": "Norsk",
+                      "Culture": "nb-NO",
+                      "TwoLetterCulture": "nb",
+                      "Link": purchaseUrlNb
+                  },
+                  {
+                      "LanguageName": "Svensk",
+                      "Culture": "sv-SE",
+                      "TwoLetterCulture": "sv",
+                      "Link": purchaseUrlSv
+                  },
+                  {
+                      "LanguageName": "English",
+                      "Culture": "en-GB",
+                      "TwoLetterCulture": "en",
+                      "Link": purchaseUrlEn
+                  }
+                ],
+                "ProductPurchaseUrls": [],
+                "Products": [],
+                "MinPrice": priceMin,
+                "MaxPrice": priceMax,
+                "Prices": [],
+                "Benefits": []
+            }
+        ]
+    };
+    //Add reworkedEvent to firestore
+    const eventRef = admin.firestore().collection(`konserthus/bølgenkino/events`).doc(eventGroupId.event_id.toString());
+    const res = await eventRef.set(reworkedEvent);
+    console.log(res);
+    })
+  .catch(error => {
+    console.log(error);
+  });
+}
+//#endregion
+
+//#region Sarpsborg (TicketCo)
+async function sarpsborg(){
+  return await axios.get("https://ticketco.events/api/public/v1/events?token=knSXQtgBsE-yXeGcKUVf")
+  .then(response => {
+    const sarpsborgEvents = response.data["events"];
+    sarpsborgEvents.map(async element => {
+      const eventID = element.id
+      return sarpsborgEventData(eventID);
+    });
+  })
+  .catch(error => {
+    console.log(error);
+  });
+};
+
+/**
+ * Imports the Tix API data into firestore
+ * @param {Object} events
+ * @return {Promise<void>}
+ */
+async function sarpsborgEventData(eventID) {
+  return await axios.get(`https://ticketco.events/api/public/v1/events/${eventID}?token=knSXQtgBsE-yXeGcKUVf`)
+  .then(async response => {
+    const eventGroupId = response.data;
+
+    const id = eventGroupId.id;
+    const name = eventGroupId.title;
+    const description = eventGroupId.description;
+    const startDate = eventGroupId.start_at;
+    const endDate = eventGroupId.end_at;
+    const image = eventGroupId.image.url;
+    const priceMin = eventGroupId.event_minimum_price;
+    const priceMax = eventGroupId.event_maximum_price;
+    const purchaseUrlNb = eventGroupId.locale_urls.nb;
+    const purchaseUrlEn = eventGroupId.locale_urls.en;
+    const purchaseUrlSv = eventGroupId.locale_urls.sv;
+    const categories = eventGroupId.event_categories;
+    const tags = eventGroupId.tags.toString();
+    const capacity = eventGroupId.total_capacities;
+    const remaining = eventGroupId.total_available;
+    //const sold = eventGroupId.total_sold;
+    const locationName = eventGroupId.location_name;
+
+    console.log(tags);
+    const reworkedEvent = 
+    {
+        "ExternalReferenceNumber": "",
+        "EventGroupId": id,
+        "Name": name,
+        "SubTitle": "",
+        "Description": description,
+        "ImageCacheKey": "",
+        "EventImagePath": image,
+        "FeaturedImagePath": image,
+        "PosterImagePath": image,
+        "ExternalUrl": "",
+        "IsFilm": "",
+        "PurchaseUrls": [
+          {
+              "LanguageName": "Norsk",
+              "Culture": "nb-NO",
+              "TwoLetterCulture": "nb",
+              "Link": purchaseUrlNb
+          },
+          {
+              "LanguageName": "Svensk",
+              "Culture": "sv-SE",
+              "TwoLetterCulture": "sv",
+              "Link": purchaseUrlSv
+          },
+          {
+              "LanguageName": "English",
+              "Culture": "en-GB",
+              "TwoLetterCulture": "en",
+              "Link": purchaseUrlEn
+          }
+        ],
+        "Translations": [],
+        "Dates": [
+            {
+                "EventId": id,
+                "DefaultEventGroupId": "",
+                "Name": name,
+                "StartDate": startDate,
+                "StartDateUTCUnix": "",
+                "EndDate": endDate,
+                "EndDateUTCUnix": "",
+                "WaitingList": "",
+                "OnlineSaleStart": "",
+                "OnlineSaleStartUTCUnix": "",
+                "OnlineSaleEnd": "",
+                "OnlineSaleEndUTCUnix": "",
+                "Venue": locationName,
+                "Hall": "",
+                "Promoter": "",
+                "SoldOut": "",
+                "Duration": "",
+                "SaleStatus": "",
+                "SaleStatusText": "",
+                "Capacity": capacity,
+                "Remaining": remaining,
+                "Categories": categories,
+                "CategoryTranslations": {},
+                "Tags": "",
+                "Translations": [],
+                "PurchaseUrls": [
+                  {
+                      "LanguageName": "Norsk",
+                      "Culture": "nb-NO",
+                      "TwoLetterCulture": "nb",
+                      "Link": purchaseUrlNb
+                  },
+                  {
+                      "LanguageName": "Svensk",
+                      "Culture": "sv-SE",
+                      "TwoLetterCulture": "sv",
+                      "Link": purchaseUrlSv
+                  },
+                  {
+                      "LanguageName": "English",
+                      "Culture": "en-GB",
+                      "TwoLetterCulture": "en",
+                      "Link": purchaseUrlEn
+                  }
+                ],
+                "ProductPurchaseUrls": [],
+                "Products": [],
+                "MinPrice": priceMin,
+                "MaxPrice": priceMax,
+                "Prices": [],
+                "Benefits": []
+            }
+        ]
+    };
+    //Add reworkedEvent to firestore
+    const eventRef = admin.firestore().collection(`konserthus/sarpsborg/events`).doc(eventGroupId.id.toString());
+    const res = await eventRef.set(reworkedEvent);
+    console.log(res);
+    })
+  .catch(error => {
+    console.log(error);
+  });
+}
+//#endregion
+
+//#region My Motown (TicketCo)
 async function myMotown(){
   return await axios.get("https://ticketco.events/api/public/v1/events/?token=_yeEt434ywPyD3TdkFaY")
   .then(response => {
-    const oseanaEvents = response.data["events"];
-    oseanaEvents.map(async element => {
+    const myMotownEvents = response.data["events"];
+    myMotownEvents.map(async element => {
       const eventID = element.id
       return myMotownEventData(eventID);
     });
@@ -42,135 +889,120 @@ async function myMotownEventData(eventID) {
   return await axios.get(`https://ticketco.events/api/public/v1/events/${eventID}?token=_yeEt434ywPyD3TdkFaY`)
   .then(async response => {
     const eventGroupId = response.data;
-    console.log(eventGroupId.id);
+
+    const id = eventGroupId.id;
+    const name = eventGroupId.title;
+    const description = eventGroupId.description;
+    const startDate = eventGroupId.start_at;
+    const endDate = eventGroupId.end_at;
+    const image = eventGroupId.image.url;
+    const priceMin = eventGroupId.event_minimum_price;
+    const priceMax = eventGroupId.event_maximum_price;
+    const purchaseUrlNb = eventGroupId.locale_urls.nb;
+    const purchaseUrlEn = eventGroupId.locale_urls.en;
+    const purchaseUrlSv = eventGroupId.locale_urls.sv;
+    const categories = eventGroupId.event_categories;
+    const tags = eventGroupId.tags.toString();
+    const capacity = eventGroupId.total_capacities;
+    const remaining = eventGroupId.total_available;
+    //const sold = eventGroupId.total_sold;
+    const locationName = eventGroupId.location_name;
+
+    console.log(tags);
+    const reworkedEvent = 
+    {
+        "ExternalReferenceNumber": "",
+        "EventGroupId": id,
+        "Name": name,
+        "SubTitle": "",
+        "Description": description,
+        "ImageCacheKey": "",
+        "EventImagePath": image,
+        "FeaturedImagePath": image,
+        "PosterImagePath": image,
+        "ExternalUrl": "",
+        "IsFilm": "",
+        "PurchaseUrls": [
+          {
+              "LanguageName": "Norsk",
+              "Culture": "nb-NO",
+              "TwoLetterCulture": "nb",
+              "Link": purchaseUrlNb
+          },
+          {
+              "LanguageName": "Svensk",
+              "Culture": "sv-SE",
+              "TwoLetterCulture": "sv",
+              "Link": purchaseUrlSv
+          },
+          {
+              "LanguageName": "English",
+              "Culture": "en-GB",
+              "TwoLetterCulture": "en",
+              "Link": purchaseUrlEn
+          }
+        ],
+        "Translations": [],
+        "Dates": [
+            {
+                "EventId": id,
+                "DefaultEventGroupId": "",
+                "Name": name,
+                "StartDate": startDate,
+                "StartDateUTCUnix": "",
+                "EndDate": endDate,
+                "EndDateUTCUnix": "",
+                "WaitingList": "",
+                "OnlineSaleStart": "",
+                "OnlineSaleStartUTCUnix": "",
+                "OnlineSaleEnd": "",
+                "OnlineSaleEndUTCUnix": "",
+                "Venue": locationName,
+                "Hall": "",
+                "Promoter": "",
+                "SoldOut": "",
+                "Duration": "",
+                "SaleStatus": "",
+                "SaleStatusText": "",
+                "Capacity": capacity,
+                "Remaining": remaining,
+                "Categories": categories,
+                "CategoryTranslations": {},
+                "Tags": "",
+                "Translations": [],
+                "PurchaseUrls": [
+                  {
+                      "LanguageName": "Norsk",
+                      "Culture": "nb-NO",
+                      "TwoLetterCulture": "nb",
+                      "Link": purchaseUrlNb
+                  },
+                  {
+                      "LanguageName": "Svensk",
+                      "Culture": "sv-SE",
+                      "TwoLetterCulture": "sv",
+                      "Link": purchaseUrlSv
+                  },
+                  {
+                      "LanguageName": "English",
+                      "Culture": "en-GB",
+                      "TwoLetterCulture": "en",
+                      "Link": purchaseUrlEn
+                  }
+                ],
+                "ProductPurchaseUrls": [],
+                "Products": [],
+                "MinPrice": priceMin,
+                "MaxPrice": priceMax,
+                "Prices": [],
+                "Benefits": []
+            }
+        ]
+    };
     //Add reworkedEvent to firestore
     const eventRef = admin.firestore().collection(`konserthus/mymotown/events`).doc(eventGroupId.id.toString());
-    const res = await eventRef.set(eventGroupId);
+    const res = await eventRef.set(reworkedEvent);
     console.log(res);
-
-    // const categories = [];
-    // await eventGroupId.categories.map(async element => {
-    //   categories.push(element.name);
-    //   categories.push(element.subcategories[0].name);
-    //   return categories.join(', ');
-    // });
-    // let local_date;
-    // try {
-    //   local_date = eventGroupId.local_event_date.value;
-    // }
-    // catch(err){
-    //   local_date = 'No date';
-    // }
-
-    // let attractionsId;
-    // let attractionsName;
-    // try{
-    //   attractionsId = eventGroupId.attractions[0].name;
-    //   attractionsName = eventGroupId.attractions[0].name;
-    // }
-    // catch(err){
-    //   attractionsId = 'Not available';
-    //   attractionsName = 'Not available';
-    // };
-
-
-    // let price_min;
-    // let price_max;
-    // try {
-    //   price_min = eventGroupId.price_ranges.including_ticket_fees.min;
-    //   price_max = eventGroupId.price_ranges.including_ticket_fees.max;
-    // }
-    // catch(err){
-    //   price_min = 'No price';
-    //   price_max = 'No price';
-    // };
-
-
-    // let image;
-    // try {
-    //   image = eventGroupId.images.standard.url;
-    // }
-    // catch(err){
-    //   image = 'No image';
-    // };
-
-
-    // let description = eventGroupId.description;
-
-    // if (typeof description !== 'undefined') {
-    //   description = description;
-
-    // }else{
-    //   description = "No description";
-    // };
-    
-    
-    // const reworkedEvent = 
-    // {
-    //     "ExternalReferenceNumber": "",
-    //     "EventGroupId": eventGroupId.id,
-    //     "Name": eventGroupId.name,
-    //     "SubTitle": "",
-    //     "Description": description,
-    //     "ImageCacheKey": "",
-    //     "EventImagePath": image,
-    //     "FeaturedImagePath": image,
-    //     "PosterImagePath": image,
-    //     "ExternalUrl": "",
-    //     "IsFilm": false,
-    //     "PurchaseUrls": [
-    //         {
-    //             "LanguageName": "Norsk",
-    //             "Culture": "nb-NO",
-    //             "TwoLetterCulture": "nb",
-    //             "Link": eventGroupId.url,
-    //         }
-    //     ],
-    //     "Translations": [],
-    //     "Dates": [
-    //         {
-    //             "EventId": attractionsId,
-    //             "DefaultEventGroupId": "",
-    //             "Name": attractionsName,
-    //             "StartDate": local_date,
-    //             "StartDateUTCUnix": "",
-    //             "EndDate": "",
-    //             "EndDateUTCUnix": "",
-    //             "WaitingList": false,
-    //             "OnlineSaleStart": eventGroupId.on_sale_date.value,
-    //             "OnlineSaleStartUTCUnix": "",
-    //             "OnlineSaleEnd": eventGroupId.off_sale_date.value,
-    //             "OnlineSaleEndUTCUnix": "",
-    //             "Venue": eventGroupId.venue.name,
-    //             "Hall": "",
-    //             "Promoter": eventGroupId.promoter.name,
-    //             "SoldOut": eventGroupId.properties.sold_out,
-    //             "Duration": "",
-    //             "SaleStatus": eventGroupId.properties.cancelled,
-    //             "SaleStatusText": eventGroupId.properties.schedule_status,
-    //             "Capacity": "",
-    //             "Remaining": "",
-    //             "Categories": categories.toString(),
-    //             "CategoryTranslations": {},
-    //             "Tags": "",
-    //             "Translations": [],
-    //             "PurchaseUrls": [
-    //                 {
-    //                     "LanguageName": "Norsk",
-    //                     "Culture": "nb-NO",
-    //                     "TwoLetterCulture": "nb",
-    //                     "Link": eventGroupId.url,
-    //                 },
-    //             ],
-    //             "ProductPurchaseUrls": [],
-    //             "Products": [],
-    //             "MinPrice": price_min,
-    //             "MaxPrice": price_max,
-    //             "Prices": [],
-    //             "Benefits": []
-    //         }
-    //     ]
-    // }
     })
   .catch(error => {
     console.log(error);
