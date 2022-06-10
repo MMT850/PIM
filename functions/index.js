@@ -15,12 +15,23 @@ const config = {
 }
 
 
-// Main function that calls functions to populate firestore from all API data.
-exports.getAllAPI = functions.https.onRequest(async () => {
-  return getEventsTicketmaster();//fredrikstadguttane(), nia(), bolgenKino(), //sarpsborg(), myMotown(), operaOstfold(), oseana(), stavanagerKonserthus(), ullensaker(), brottetAmfi(), 
-  // stavangeren(), mossKulturhus(), solaKulturhus(), aelvespeilet(), drammenUnion(), 
-  // drammenTeater(), notteroyKulturhus(), kongsberg(), ibsenhuset(), arendalKulturhus(), 
-  // askimKulturhus(), sandnesKulturhus(), bolgenKulturhus();
+// Main functions that call functions to populate firestore from all API data.
+exports.getTicketmasterAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
+  return await getEventsTicketmaster();
+
+});
+
+exports.getTixAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
+  return await getEventsTix();
+
+});
+
+exports.getDxAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
+  return await getEventsDX();
+});
+
+exports.getTicketCoAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
+  return await getEventsTicketCo();
 
 });
 
@@ -62,6 +73,7 @@ const dxAPI = [
 
 async function getEventsDX(){
   for (let i = 0; i < dxAPI.length; i++) {
+    console.log(i);
     await axios.get(dxAPI[i]["all"] +'&after_date='+ formatedDate, config)
     .then(response => {
       
@@ -413,7 +425,6 @@ async function getEventsTicketmaster(){
     await axios.get(`https://app.ticketmaster.eu/mfxapi/v2/events` + TicketmasterAPI[i]["apiKey"] + TicketmasterAPI[i]["parameters"])
     .then(response => {
       const events = response.data["events"];
-      console.log(events.length);
 
       events.map(async element => {
         const eventID = element.id
@@ -436,13 +447,18 @@ async function getEventsTicketmaster(){
           }
       
           let attractionsId;
-          let attractionsName;
           try{
-            attractionsId = eventGroupId.attractions[0].name;
-            attractionsName = eventGroupId.attractions[0].name;
+            attractionsId = eventGroupId.attractions[0].id;
           }
           catch(err){
             attractionsId = 'Not available';
+          };
+
+          let attractionsName;
+          try{
+            attractionsName = eventGroupId.attractions[0].name;
+          }
+          catch(err){
             attractionsName = 'Not available';
           };
       
@@ -559,6 +575,97 @@ async function getEventsTicketmaster(){
   }
 };
 //#endregion
+
+//#region TIX API
+const tixAPI = [
+  {
+    "apiKey": "2d31a411de6342a1",
+    "name": "StavangerKonserthus"
+  },
+  {
+    "apiKey": "2e3aa1d4758049c9",
+    "name": "MossKulturhus"
+  },
+  {
+    "apiKey": "625a4ae28f9340ef",
+    "name": "SolaKulturhus"
+  },
+  {
+    "apiKey": "8efc856f1b704a94",
+    "name": "BølgenKulturhus"
+  },
+  {
+    "apiKey": "97bd45c4aa32fe43",
+    "name": "SandnesKulturhus"
+  },
+  {
+    "apiKey": "3a056daed43e480b",
+    "name": "AskimKulturhus"
+  },
+  {
+    "apiKey": "a9a8392408f64a9e",
+    "name": "ArendalKulturhus"
+  },
+  {
+    "apiKey": "9dc82c6662d44644",
+    "name": "Ibsenhuset"
+  },
+  {
+    "apiKey": "0f904f1629c04bb0",
+    "name": "Kongsberg"
+  },
+  {
+    "apiKey": "q58NgeZx9cx29Abw",
+    "name": "Nøtterøy"
+  },
+  {
+    "apiKey": "7ed571aa6e8d4cf7",
+    "name": "DrammenTeater"
+  },
+  {
+    "apiKey": "81435037e05845d6",
+    "name": "DrammenUnionScene"
+  },
+  {
+    "apiKey": "4e46b9b97b3a4647",
+    "name": "Ælvespeilet"
+  },
+];
+
+/**
+ * Imports the Tix API data into firestore
+ * @param {Object} events
+ * @return {Promise<void>}
+ */
+
+async function getEventsTix(){
+  for (let i = 0; i < tixAPI.length; i++) {
+    
+    await axios.get("https://eventapi.tix.no/v2/Events/" + tixAPI[i]["apiKey"])
+    .then(async response => {
+      const events = response.data;
+      
+      for (let j = 0; j < events.length; j++) {
+        
+        const eventGroupId = events[j]["EventGroupId"].toString();
+        const eventRef = admin
+          .firestore()
+          .collection(`konserthus/${tixAPI[i]["name"]}/events`)
+          .doc(eventGroupId);
+    
+        const res = await eventRef.set(events[j]);
+        console.log(res);
+      }
+    })
+    .catch(error => {
+      console.log(error);
+    });
+  };
+};
+//#endregion
+
+
+//--------------------- Hente inn fra induviduell konserthus for testing ---------------------
 
 //#region Fredrikstadguttane (DX)
 
@@ -903,7 +1010,7 @@ async function niaEventData(eventID) {
 }
 //#endregion
 
-//#region Bølgen Kino (DX)
+//#region Bølgen Kino (DX) 
 
 async function bolgenKino(){
   console.log(formatedDate);
@@ -1074,7 +1181,7 @@ async function bolgenKinoEventData(eventID) {
 }
 //#endregion
 
-//#region Sarpsborg (TicketCo)
+//#region Sarpsborg (TicketCo) 
 async function sarpsborg(){
   return await axios.get("https://ticketco.events/api/public/v1/events?token=knSXQtgBsE-yXeGcKUVf")
   .then(response => {
@@ -1219,7 +1326,7 @@ async function sarpsborgEventData(eventID) {
 }
 //#endregion
 
-//#region My Motown (TicketCo)
+//#region My Motown (TicketCo) 
 async function myMotown(){
   return await axios.get("https://ticketco.events/api/public/v1/events/?token=_yeEt434ywPyD3TdkFaY")
   .then(response => {
@@ -1364,7 +1471,7 @@ async function myMotownEventData(eventID) {
 }
 //#endregion
 
-//#region Opera Østfold (Ticketmaster) Ingen feil
+//#region Opera Østfold (Ticketmaster) 
 async function operaOstfold(){
   return await axios.get("https://app.ticketmaster.eu/mfxapi/v2/events?apikey=2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL&domain=norway&venue_ids=2263,16749,9989,18217&rows=250")
   .then(response => {
@@ -1520,7 +1627,7 @@ async function operaOstfoldEventData(operaOstfoldEventID) {
 }
 //#endregion
 
-//#region Stavangeren (Tickemaster) Ingen feil 
+//#region Stavangeren (Tickemaster)  
 async function stavangeren(){
   return await axios.get("https://app.ticketmaster.eu/mfxapi/v2/events?apikey=2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL&domain=norway&venue_ids=6253,6255,13077&rows=250")
   .then(response => {
@@ -1835,7 +1942,7 @@ async function brottetAmfiEventData(brottetAmfiEventID) {
 }
 //#endregion
 
-//#region Oseana (Ticketmaster) Ingen feil
+//#region Oseana (Ticketmaster) 
 
 
 // Gets ticketmaster event id's so they can be passed to the importEventData function.
@@ -1996,7 +2103,7 @@ async function importEventData(eventID) {
 
 //#endregion
 
-//#region Ullensaker (Ticketmaster) Ingen feil
+//#region Ullensaker (Ticketmaster) 
 async function ullensaker(){
   return await axios.get("https://app.ticketmaster.eu/mfxapi/v2/events?apikey=2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL&domain=norway&venue_ids=7555,7557,7559,7561,7581,20269&rows=250")
   .then(response => {
@@ -2155,7 +2262,7 @@ async function ullensakerEventData(ullensakerEventID) {
 
 //#endregion
 
-//#region Stavanger Konserthus (TIX) Ingen feil
+//#region Stavanger Konserthus (TIX) 
 
 
 async function stavanagerKonserthus(){
@@ -2189,7 +2296,7 @@ async function importEventDataTIX(events) {
 }
 //#endregion
 
-//#region Moss kulturhus (TIX) Ingen feil
+//#region Moss kulturhus (TIX) 
 
 async function mossKulturhus(){
   return await axios.get("https://eventapi.tix.no/v2/Events/2e3aa1d4758049c9/")
@@ -2222,7 +2329,7 @@ async function mossEventDataTIX(events) {
 }
 //#endregion
 
-//#region Sola Kulturhus (TIX) Ingen feil
+//#region Sola Kulturhus (TIX) 
 async function solaKulturhus(){
   return await axios.get("https://eventapi.tix.no/v2/Events/625a4ae28f9340ef/")
   .then(response => {
@@ -2254,7 +2361,7 @@ async function solaEventDataTIX(events) {
 }
 //#endregion
 
-//#region Bølgen Kulturhus (TIX) Ingen feil
+//#region Bølgen Kulturhus (TIX) 
 async function bolgenKulturhus(){
   return await axios.get("https://eventapi.tix.no/v2/Events/8efc856f1b704a94/")
   .then(response => {
@@ -2286,7 +2393,7 @@ async function bolgenEventDataTIX(events) {
 }
 //#endregion
 
-//#region Sandnes Kulturhus (TIX) Ingen feil
+//#region Sandnes Kulturhus (TIX) 
 async function sandnesKulturhus(){
   return await axios.get("https://eventapi.tix.no/v2/Events/97bd45c4aa32fe43/")
   .then(response => {
@@ -2318,7 +2425,7 @@ async function sandnesEventDataTIX(events) {
 }
 //#endregion
 
-//#region Askim Kulturhus (TIX) Ingen feil
+//#region Askim Kulturhus (TIX) 
 async function askimKulturhus(){
   return await axios.get("https://eventapi.tix.no/v2/Events/3a056daed43e480b/")
   .then(response => {
@@ -2350,7 +2457,7 @@ async function askimEventDataTIX(events) {
 }
 //#endregion
 
-//#region Arendal Kulturhus (TIX) Ingen feil
+//#region Arendal Kulturhus (TIX) 
 async function arendalKulturhus(){
   return await axios.get("https://eventapi.tix.no/v2/Events/a9a8392408f64a9e/")
   .then(response => {
@@ -2382,7 +2489,7 @@ async function arendalEventDataTIX(events) {
 }
 //#endregion
 
-//#region Ibsenhuset (TIX) Ingen feil
+//#region Ibsenhuset (TIX) 
 async function ibsenhuset(){
   return await axios.get("https://eventapi.tix.no/v2/Events/9dc82c6662d44644/")
   .then(response => {
@@ -2414,7 +2521,7 @@ async function ibsenhusetEventDataTIX(events) {
 }
 //#endregion
 
-//#region Kongsberg Kulturhus (TIX) Ingen feil
+//#region Kongsberg Kulturhus (TIX) 
 async function kongsberg(){
   return await axios.get("https://eventapi.tix.no/v2/Events/0f904f1629c04bb0/")
   .then(response => {
@@ -2446,7 +2553,7 @@ async function kongsbergEventDataTIX(events) {
 }
 //#endregion
 
-//#region Nøtterøy (TIX) Ingen feil
+//#region Nøtterøy (TIX) 
 async function notteroyKulturhus(){
   return await axios.get("https://eventapi.tix.no/v2/Events/q58NgeZx9cx29Abw/")
   .then(response => {
@@ -2478,7 +2585,7 @@ async function notteroyEventDataTIX(events) {
 }
 //#endregion
 
-//#region Drammen Scener - Drammens teater (TIX) Ingen feil
+//#region Drammen Scener - Drammens teater (TIX) 
 async function drammenTeater(){
   return await axios.get("https://eventapi.tix.no/v2/Events/7ed571aa6e8d4cf7/")
   .then(response => {
@@ -2510,7 +2617,7 @@ async function drammenTeaterEventDataTIX(events) {
 }
 //#endregion
 
-//#region Drammen Scener - Union Scene (TIX) Ingen feil
+//#region Drammen Scener - Union Scene (TIX) 
 async function drammenUnion(){
   return await axios.get("https://eventapi.tix.no/v2/Events/81435037e05845d6/")
   .then(response => {
@@ -2542,7 +2649,7 @@ async function drammenUnionEventDataTIX(events) {
 }
 //#endregion
 
-//#region Ælvespeilet (TIX) Ingen feil
+//#region Ælvespeilet (TIX) 
 async function aelvespeilet(){
   return await axios.get("https://eventapi.tix.no/v2/Events/4e46b9b97b3a4647/")
   .then(response => {
