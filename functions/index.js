@@ -6,7 +6,7 @@ const axios = require("axios");
 const admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.firestore();
-db.settings({ ignoreUdefinedProperties: true });
+
 
 //Bearer token for DX API
 const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6ImM2ZTQxOGQ3MGVlNjNkMDA3ZmI2NmFhMzYyM2U3M2Q2NzZlYmQ2Njk2NzQzOGNiOGVjODdjMTcwNWJmYmMxZGQzNmU3ZWE1ZDQ0NDQ4YTlhIn0.eyJhdWQiOiIxIiwianRpIjoiYzZlNDE4ZDcwZWU2M2QwMDdmYjY2YWEzNjIzZTczZDY3NmViZDY2OTY3NDM4Y2I4ZWM4N2MxNzA1YmZiYzFkZDM2ZTdlYTVkNDQ0NDhhOWEiLCJpYXQiOjE2MjMyNDEwMzEsIm5iZiI6MTYyMzI0MTAzMSwiZXhwIjo0Nzc4OTE0NjMxLCJzdWIiOiIyOCIsInNjb3BlcyI6W119.BiIQJgoJ6lyVxiQ2FppMmiZFGSPO5LA-Fc-o91aIabgveoW-G6XprAm_uUClwuOvUHPedqlThsZFokB9VWx9zLLaJ31RX_-e7o-tbJVJLMcdo-IeGr2Y3-o0zo2Jq3_uipdUnjXu9X4rK76RAs8h9mPGXsPc2cN6n55trAVREJQXgpym5IyO-Hu9iiXyZahwAiB13a839LgNzK1OO1kcMuMTFLNpj5grlMQ3b7QXrg5ark4Sd6rBfEnQlk-g3lKKcEb2W3Bk30_HmmBlMG5u8FcGihrFoirdY_6_WFJ_SVZeOmymAjhRUQXBzYDa21NZZiQo0fT9Vs-mJzJASZTo2iI_0jnrULwDCztyHL1NM0i7Akq4beSthidaa2X2O4vBvesvklUPoKU6kcdjlV03d7_HKiMC5klh9OhqIPA8roMIHLmiASIaxWNu_i6scIf5PImlovoyuwD03QC_6aGF8FBq2zEQ17TIw0xeK3tKdBE2sbwfFQyV1EOlmfYW9e_JmyxsWbbpPbVXhgjKqEXamTBGpiprjbETF3C6Io1tyj54pDuOnKkdaTpOGJvwCTvj6fXlPooRURwMHa-l9892M_7S3z8pyERpwrsavVmTop06tfks-6XKtOR9T0w1GLsKVb2Gq_aQKgwRlZlJ912OdBAxrvkbbLqPeVQSneVOxf0";
@@ -16,72 +16,241 @@ const config = {
 
 
 // Main functions that call functions to populate firestore from all API data.
-exports.getTicketmasterAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
-  return await getEventsTicketmaster();
 
+//#region Cloud Scheduled Functions
+exports.getTixAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
+  const infoApiTix = await getAPIFields();
+  return await getEventsTix(infoApiTix[0]);
 });
 
-exports.getTixAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
-  return await getEventsTix();
-
+exports.getTicketmasterAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
+  const infoApiTicketmaster = await getAPIFields();
+  return await getEventsTicketmaster(infoApiTicketmaster[1]);
 });
 
 exports.getDxAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
-  return await getEventsDX();
+  const infoApiDx = await getAPIFields();
+  return await getEventsDX(infoApiDx[2]);
 });
 
 exports.getTicketCoAPI = functions.region('europe-west3').pubsub.schedule('every 30 minutes').onRun(async () => {
-  return await getEventsTicketCo();
+  const infoApiTicketCO = await getAPIFields();
+  return await getEventsTicketCo(infoApiTicketCO[3]);
+});
+
+//#endregion
+
+//#region https Functions 
+exports.manualGetTixAPI = functions.region('europe-west3').https.onCall(async () => {
+  const infoApiTix = await getAPIFields();
+  return await getEventsTix(infoApiTix[0]);
 
 });
+
+exports.manualGetTicketmasterAPI = functions.region('europe-west3').https.onCall(async () => {
+  const infoApiTicketmaster = await getAPIFields();
+  return await getEventsTicketmaster(infoApiTicketmaster[1]);
+
+});
+
+exports.manualGetDxAPI = functions.region('europe-west3').https.onCall(async () => {
+  const infoApiDx = await getAPIFields();
+  return await getEventsDX(infoApiDx[2]);
+
+});
+
+exports.manualGetTicketCoAPI = functions.region('europe-west3').https.onCall(async () => {
+  const infoApiTicketCO = await getAPIFields();
+  return await getEventsTicketCo(infoApiTicketCO[3]);
+
+});
+//#endregion 
+
+//#region test
+
+// exports.fillFirestoreTestData = functions.region('europe-west3').https.onRequest(async () => {
+//   testTix = [
+//     {
+//       name: 'ArendalKulturhus',
+//       apiKey: 'a9a8392408f64a9e',
+//       api: 'TIX'
+//     },
+//     {
+//       name: "MossKulturhus",
+//       apiKey: "2e3aa1d4758049c9",
+//       api: 'TIX'
+//     },
+//   ]
+//   testTicketmaster = [
+//     {
+//       name: 'OperaØstfold',
+//       apiKey: '2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL',
+//       venueId: '2263,16749,9989,18217',
+//       api: 'Ticketmaster'
+//     },
+//   ]
+//   testDx = [
+//     {
+//       name: 'LillestrømKultursenter',
+//       partnerId: '120',
+//       api: 'DX'
+//     },
+//   ]
+//   testTicketCo = [
+//     {
+//       name: 'Sarpsborg',
+//       token: 'knSXQtgBsE-yXeGcKUVf',
+//       api: 'TicketCo'
+//     },
+//   ]
+//   for (let i = 0; i < testTix.length; i++) {
+
+//     const eventGroupId = testTix[i]["name"].toString();
+//     const eventRef = admin
+//       .firestore()
+//       .collection(`konserthus`)
+//       .doc(eventGroupId);
+
+//     const res = await eventRef.set(testTix[i]);
+//     console.log(res);
+//   };
+//   for (let i = 0; i < testTicketmaster.length; i++) {
+
+//     const eventGroupId = testTicketmaster[i]["name"].toString();
+//     const eventRef = admin
+//       .firestore()
+//       .collection(`konserthus`)
+//       .doc(eventGroupId);
+
+//     const res = await eventRef.set(testTicketmaster[i]);
+//     console.log(res);
+//   };
+//   for (let i = 0; i < testDx.length; i++) {
+
+//     const eventGroupId = testDx[i]["name"].toString();
+//     const eventRef = admin
+//       .firestore()
+//       .collection(`konserthus`)
+//       .doc(eventGroupId);
+
+//     const res = await eventRef.set(testDx[i]);
+//     console.log(res);
+//   };
+//   for (let i = 0; i < testTicketCo.length; i++) {
+
+//     const eventGroupId = testTicketCo[i]["name"].toString();
+//     const eventRef = admin
+//       .firestore()
+//       .collection(`konserthus`)
+//       .doc(eventGroupId);
+
+//     const res = await eventRef.set(testTicketCo[i]);
+//     console.log(res);
+//   };
+//   return "done";
+// });
+
+// exports.getAPIFields = functions.region('europe-west3').https.onRequest(async () => {
+//   return await getAPIFields();
+// });
+
+let tix = [];
+let ticketmaster = [];
+let dx = [];
+let ticketco = [];
+async function getAPIFields(){ //AVSLUTTET HER, Må bare få inn dataen fra TicketCo her nå, så kna man teste om det fungere gjennom cloud functions.
+  let _tix = [];                
+  let _ticketmaster = [];
+  let _dx = [];
+  let _ticketco = [];
+  let name; 
+  let apiKey;
+  let venueId;
+  let partnerId;
+  let token;
+
+  const concertHalls = admin.firestore().collection('konserthus');
+  const snapshot = await concertHalls.get();
+  snapshot.forEach(doc => {
+    switch(doc.data().api.toLowerCase()){
+      case "tix":
+        name = doc.data().name;
+        apiKey = doc.data().apiKey;
+        _tix.push({name, apiKey});
+        break;
+      case "ticketmaster":
+        name = doc.data().name;
+        apiKey = doc.data().apiKey;
+        venueId = doc.data().venueId;
+        _ticketmaster.push({name, apiKey, venueId});
+        break;
+      case "dx":
+        name = doc.data().name;
+        partnerId = doc.data().partnerId;
+        _dx.push({name, partnerId});
+        break;
+      case "ticketco":
+        name = doc.data().name;
+        token = doc.data().token;
+        _ticketco.push({name, token});
+        break;
+    }
+  });
+  tix = _tix;
+  ticketmaster = _ticketmaster;
+  dx = _dx;
+  ticketco = _ticketco;
+  return [tix, ticketmaster, dx, ticketco];
+};
+//#endregion
 
 //#region DX API
 let newDate = new Date()
 let formatedDate = newDate.toISOString().split('T')[0];
 const dxAPI = [
-  {
-    "all": `https://public.dx.no/v1/partners/178/events/?size=50&order_by=nowfuturepast`,
-    "single": `https://public.dx.no/v1/partners/178/events/`,
-    "name": "Fredrikstadguttane"
-  },
-  {
-    "all": `https://public.dx.no/v1/partners/318/events/?size=50&order_by=nowfuturepast`,
-    "single": `https://public.dx.no/v1/partners/318/events/`,
-    "name": "NIA"
-  },
-  {
-    "all": `https://public.dx.no/v1/partners/168/events/?size=50&order_by=nowfuturepast`,
-    "single": `https://public.dx.no/v1/partners/168/events/`,
-    "name": "BølgenKino"
-  },
-  {
-    "all": `https://public.dx.no/v1/partners/120/events/?size=50&order_by=nowfuturepast`,
-    "single": `https://public.dx.no/v1/partners/120/events/`,
-    "name": "LillestrømKulturhus"
-  },
-  {
-    "all": `https://public.dx.no/v1/partners/106/events/?size=50&order_by=nowfuturepast`,
-    "single": `https://public.dx.no/v1/partners/106/events/`,
-    "name": "LørenskogHus"
-  },
-  {
-    "all": `https://public.dx.no/v1/partners/301/events/?size=50&order_by=nowfuturepast`,
-    "single": `https://public.dx.no/v1/partners/301/events/`,
-    "name": "Storstova"
-  },
+  // {
+  //   "all": `https://public.dx.no/v1/partners/178/events/?size=50&order_by=nowfuturepast`,
+  //   "single": `https://public.dx.no/v1/partners/178/events/`,
+  //   "name": "Fredrikstadguttane"
+  // },
+  // {
+  //   "all": `https://public.dx.no/v1/partners/318/events/?size=50&order_by=nowfuturepast`,
+  //   "single": `https://public.dx.no/v1/partners/318/events/`,
+  //   "name": "NIA"
+  // },
+  // {
+  //   "all": `https://public.dx.no/v1/partners/168/events/?size=50&order_by=nowfuturepast`,
+  //   "single": `https://public.dx.no/v1/partners/168/events/`,
+  //   "name": "BølgenKino"
+  // },
+  // {
+  //   "all": `https://public.dx.no/v1/partners/120/events/?size=50&order_by=nowfuturepast`,
+  //   "single": `https://public.dx.no/v1/partners/120/events/`,
+  //   "name": "LillestrømKulturhus"
+  // },
+  // {
+  //   "all": `https://public.dx.no/v1/partners/106/events/?size=50&order_by=nowfuturepast`,
+  //   "single": `https://public.dx.no/v1/partners/106/events/`,
+  //   "name": "LørenskogHus"
+  // },
+  // {
+  //   "all": `https://public.dx.no/v1/partners/301/events/?size=50&order_by=nowfuturepast`,
+  //   "single": `https://public.dx.no/v1/partners/301/events/`,
+  //   "name": "Storstova"
+  // },
 ];
 
-async function getEventsDX(){
-  for (let i = 0; i < dxAPI.length; i++) {
-    console.log(i);
-    await axios.get(dxAPI[i]["all"] +'&after_date='+ formatedDate, config)
+async function getEventsDX(dx){
+  console.log(dx);
+  for (let i = 0; i < dx.length; i++) {
+    await axios.get('https://public.dx.no/v1/partners/'+ dx[i].partnerId +'/events/?size=50&order_by=nowfuturepast' +'&after_date='+ formatedDate, config)
     .then(response => {
       
       const events = response.data["data"];
       events.map(async element => {
         
         const eventID = element.event_id
-        await axios.get(dxAPI[i]["single"] + eventID, config)
+        await axios.get('https://public.dx.no/v1/partners/'+ dx[i].partnerId +'/events/' + eventID, config)
         .then(async response => {
           
           const eventGroupId = response.data["data"];
@@ -224,7 +393,7 @@ async function getEventsDX(){
               ]
           };
           //Add reworkedEvent to firestore
-          const eventRef = admin.firestore().collection(`konserthus/${dxAPI[i]["name"]}/events`).doc(eventGroupId.event_id.toString());
+          const eventRef = admin.firestore().collection(`konserthus/${dx[i]["name"]}/events`).doc(eventGroupId.event_id.toString());
           const res = await eventRef.set(reworkedEvent);
           console.log(res);
           })
@@ -242,25 +411,25 @@ async function getEventsDX(){
 
 //#region TicketCo API, Ikke alle som har status key, så må kansje finne en annen løsning for å hente nåverende eventer.
 const TicketCoAPI = [
-  {
-    "token": `?token=_yeEt434ywPyD3TdkFaY`,
-    "name": "MyMotown"
-  },
-  {
-    "token": `?token=knSXQtgBsE-yXeGcKUVf`,
-    "name": "Sarpsborg"
-  },
+  // {
+  //   "token": `_yeEt434ywPyD3TdkFaY`,
+  //   "name": "MyMotown"
+  // },
+  // {
+  //   "token": `knSXQtgBsE-yXeGcKUVf`,
+  //   "name": "Sarpsborg"
+  // },
 ];
-async function getEventsTicketCo(){
-  for (let i = 0; i < TicketCoAPI.length; i++) {
-    await axios.get(`https://ticketco.events/api/public/v1/events/` + TicketCoAPI[i]["token"] + `&status=active`)
+async function getEventsTicketCo(ticketco){
+  for (let i = 0; i < ticketco.length; i++) {
+    await axios.get(`https://ticketco.events/api/public/v1/events?token=` + ticketco[i]["token"] + `&status=active`)
     .then(response => {
       
       const events = response.data["events"];
       events.map(async element => {
         
         const eventID = element.id
-        await axios.get(`https://ticketco.events/api/public/v1/events/` + eventID + TicketCoAPI[i]["token"])
+        await axios.get(`https://ticketco.events/api/public/v1/events/` + eventID + '?token=' + ticketco[i]["token"])
         .then(async response => {
           
           const eventGroupId = response.data;
@@ -375,7 +544,7 @@ async function getEventsTicketCo(){
               ]
           };
           //Add reworkedEvent to firestore
-          const eventRef = admin.firestore().collection(`konserthus/${TicketCoAPI[i]["name"]}/events`).doc(eventGroupId.id.toString());
+          const eventRef = admin.firestore().collection(`konserthus/${ticketco[i]["name"]}/events`).doc(eventGroupId.id.toString());
           const res = await eventRef.set(reworkedEvent);
           console.log(res);
           })
@@ -393,43 +562,44 @@ async function getEventsTicketCo(){
 
 //#region Ticketmaster API
 const TicketmasterAPI = [
-  {
-    "apiKey": "?apikey=2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
-    "parameters": `&domain=norway&venue_ids=2263,16749,9989,18217&rows=250`,
-    "name": "OperaØstfold"
-  },
-  {
-    "apiKey": "?apikey=2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
-    "parameters": `&domain=norway&venue_ids=7555,7557,7559,7561,7581,20269&rows=250`,
-    "name": "Ullensaker"
-  },
-  {
-    "apiKey": "?apikey=2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
-    "parameters": `&domain=norway&venue_ids=14597&rows=250`,
-    "name": "BrottetAmfi"
-  },
-  {
-    "apiKey": "?apikey=2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
-    "parameters": `&domain=norway&venue_ids=6253,6255,13077&rows=250`,
-    "name": "Stavangeren"
-  },
-  {
-    "apiKey": "?apikey=2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
-    "parameters": `&domain=norway&venue_ids=9589&rows=250`,
-    "name": "Oseana"
-  },
+  // {
+  //   "apiKey": "2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
+  //   "parameters": `&domain=norway&venue_ids=2263,16749,9989,18217&rows=250`,
+  //   "name": "OperaØstfold"
+  // },
+  // {
+  //   "apiKey": "2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
+  //   "parameters": `&domain=norway&venue_ids=7555,7557,7559,7561,7581,20269&rows=250`,
+  //   "name": "Ullensaker"
+  // },
+  // {
+  //   "apiKey": "2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
+  //   "parameters": `&domain=norway&venue_ids=14597&rows=250`,
+  //   "name": "BrottetAmfi"
+  // },
+  // {
+  //   "apiKey": "2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
+  //   "parameters": `&domain=norway&venue_ids=6253,6255,13077&rows=250`,
+  //   "name": "Stavangeren"
+  // },
+  // {
+  //   "apiKey": "2ymb1MA5BlA2HiZUJWMmAwLW26A5wCEL",
+  //   "parameters": `&domain=norway&venue_ids=9589&rows=250`,
+  //   "name": "Oseana"
+  // },
 
 ];
-async function getEventsTicketmaster(){
-  for (let i = 0; i < TicketmasterAPI.length; i++) {
-    await axios.get(`https://app.ticketmaster.eu/mfxapi/v2/events` + TicketmasterAPI[i]["apiKey"] + TicketmasterAPI[i]["parameters"])
+async function getEventsTicketmaster(ticketmaster){
+  console.log(ticketmaster);
+  for (let i = 0; i < ticketmaster.length; i++) {
+    await axios.get(`https://app.ticketmaster.eu/mfxapi/v2/events?apikey=` + ticketmaster[i]["apiKey"] + "&domain=norway&venue_ids=" + ticketmaster[i]["venueId"] + "&rows=250")
     .then(response => {
       const events = response.data["events"];
 
       events.map(async element => {
         const eventID = element.id
 
-        await axios.get(`https://app.ticketmaster.eu/mfxapi/v2/events/` + eventID + TicketmasterAPI[i]["apiKey"] + `&domain=norway`)
+        await axios.get(`https://app.ticketmaster.eu/mfxapi/v2/events/` + eventID + '?apikey=' +  ticketmaster[i]["apiKey"] + `&domain=norway`)
         .then(async response => {
           const eventGroupId = response.data;
           const categories = [];
@@ -560,7 +730,7 @@ async function getEventsTicketmaster(){
               ]
           }
           //Add reworkedEvent to firestore
-          const eventRef = admin.firestore().collection(`konserthus/${TicketmasterAPI[i]["name"]}/events`).doc(reworkedEvent.EventGroupId);
+          const eventRef = admin.firestore().collection(`konserthus/${ticketmaster[i]["name"]}/events`).doc(reworkedEvent.EventGroupId);
           const res = await eventRef.set(reworkedEvent);
           console.log(res);
           })
@@ -578,58 +748,58 @@ async function getEventsTicketmaster(){
 
 //#region TIX API
 const tixAPI = [
-  {
-    "apiKey": "2d31a411de6342a1",
-    "name": "StavangerKonserthus"
-  },
-  {
-    "apiKey": "2e3aa1d4758049c9",
-    "name": "MossKulturhus"
-  },
-  {
-    "apiKey": "625a4ae28f9340ef",
-    "name": "SolaKulturhus"
-  },
-  {
-    "apiKey": "8efc856f1b704a94",
-    "name": "BølgenKulturhus"
-  },
-  {
-    "apiKey": "97bd45c4aa32fe43",
-    "name": "SandnesKulturhus"
-  },
-  {
-    "apiKey": "3a056daed43e480b",
-    "name": "AskimKulturhus"
-  },
-  {
-    "apiKey": "a9a8392408f64a9e",
-    "name": "ArendalKulturhus"
-  },
-  {
-    "apiKey": "9dc82c6662d44644",
-    "name": "Ibsenhuset"
-  },
-  {
-    "apiKey": "0f904f1629c04bb0",
-    "name": "Kongsberg"
-  },
-  {
-    "apiKey": "q58NgeZx9cx29Abw",
-    "name": "Nøtterøy"
-  },
-  {
-    "apiKey": "7ed571aa6e8d4cf7",
-    "name": "DrammenTeater"
-  },
-  {
-    "apiKey": "81435037e05845d6",
-    "name": "DrammenUnionScene"
-  },
-  {
-    "apiKey": "4e46b9b97b3a4647",
-    "name": "Ælvespeilet"
-  },
+  // {
+  //   "apiKey": "2d31a411de6342a1",
+  //   "name": "StavangerKonserthus"
+  // },
+  // {
+  //   "apiKey": "2e3aa1d4758049c9",
+  //   "name": "MossKulturhus"
+  // },
+  // {
+  //   "apiKey": "625a4ae28f9340ef",
+  //   "name": "SolaKulturhus"
+  // },
+  // {
+  //   "apiKey": "8efc856f1b704a94",
+  //   "name": "BølgenKulturhus"
+  // },
+  // {
+  //   "apiKey": "97bd45c4aa32fe43",
+  //   "name": "SandnesKulturhus"
+  // },
+  // {
+  //   "apiKey": "3a056daed43e480b",
+  //   "name": "AskimKulturhus"
+  // },
+  // {
+  //   "apiKey": "a9a8392408f64a9e",
+  //   "name": "ArendalKulturhus"
+  // },
+  // {
+  //   "apiKey": "9dc82c6662d44644",
+  //   "name": "Ibsenhuset"
+  // },
+  // {
+  //   "apiKey": "0f904f1629c04bb0",
+  //   "name": "Kongsberg"
+  // },
+  // {
+  //   "apiKey": "q58NgeZx9cx29Abw",
+  //   "name": "Nøtterøy"
+  // },
+  // {
+  //   "apiKey": "7ed571aa6e8d4cf7",
+  //   "name": "DrammenTeater"
+  // },
+  // {
+  //   "apiKey": "81435037e05845d6",
+  //   "name": "DrammenUnionScene"
+  // },
+  // {
+  //   "apiKey": "4e46b9b97b3a4647",
+  //   "name": "Ælvespeilet"
+  // },
 ];
 
 /**
@@ -638,10 +808,9 @@ const tixAPI = [
  * @return {Promise<void>}
  */
 
-async function getEventsTix(){
-  for (let i = 0; i < tixAPI.length; i++) {
-    
-    await axios.get("https://eventapi.tix.no/v2/Events/" + tixAPI[i]["apiKey"])
+async function getEventsTix(tix){
+  for (let i = 0; i < tix.length; i++) {
+    await axios.get("https://eventapi.tix.no/v2/Events/" + tix[i]["apiKey"])
     .then(async response => {
       const events = response.data;
       
@@ -650,7 +819,7 @@ async function getEventsTix(){
         const eventGroupId = events[j]["EventGroupId"].toString();
         const eventRef = admin
           .firestore()
-          .collection(`konserthus/${tixAPI[i]["name"]}/events`)
+          .collection(`konserthus/${tix[i]["name"]}/events`)
           .doc(eventGroupId);
     
         const res = await eventRef.set(events[j]);
